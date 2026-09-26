@@ -1,0 +1,44 @@
+[0] Theory:Assignment is reverse of this setup
+
+
+
+Forward (Light-Based) Ray Tracing for a Sphere with Multiple Point Lights
+[1] 1. Problem Statement
+[2] Design and describe an efficient forward (light-based) ray-tracing algorithm that renders a sphere illuminated by n point light sources. Unlike the classical (backward) ray-tracing algorithm covered in class — where the primary ray originates at the viewer/eye and a shadow ray is sent from the surface to each light — here the ray must originate at each light source, be traced until it strikes the sphere, and then be connected to the eye to produce the final shaded, visible image.
+[3] 2. Introduction
+[4] Ray tracing is a global illumination technique that integrates shading, shadow generation, hidden-surface removal and projection into one process. The classical (backward) algorithm fires a primary ray from the eye through each pixel, finds the nearest surface it hits, and then sends a shadow ray from that surface to each light to test occlusion. Forward (light-based) ray tracing reverses this: rays are emitted from the lights themselves.
+[5] Three candidate algorithms were considered:
+[6] A. Naive random forward tracing — emit rays from each light in random directions over the full sphere of directions (4π steradians) and keep only the ones that eventually reach the eye. Problem: the probability of a randomly emitted ray landing on the tiny camera aperture is almost zero, so nearly all traced rays are wasted.
+[7] B. Photon mapping (two-pass) — forward-trace rays and store "photons" at hit points in a spatial map, then gather from the eye in a second pass. Problem: needs a spatial photon-map data structure and a density-estimation gather step — powerful for caustics/global illumination, but unnecessary overhead for one sphere and a few point lights.
+[8] C. Targeted forward tracing with direct eye-connection — restrict each light's emission to only the solid angle actually subtended by the sphere, find the hit using the closed-form ray–sphere quadratic, shade the point, and connect it to the eye with a single ray for visibility/projection.
+[9] Chosen algorithm: C. It removes almost all of the wasted rays that make Option A impractical, without the extra data-structure overhead of Option B. It also reuses the exact closed-form ray–sphere intersection formula already taught in class, and it is the most direct reversal of the class algorithm — the roles of "primary ray" and "shadow ray" are simply swapped: the light now emits the primary ray, and what used to be the shadow ray (surface → light) becomes a connection ray (surface → eye).
+[10] 3. Pseudo Algorithm (text form)
+[11] For each light source i = 1 to n, determine the solid angle subtended by the sphere as seen from that light, and restrict all emitted ray directions d to lie within this cone (targeted emission, not random).
+[12] For each sampled direction d from light i (ray origin s = position of light i), compute B = 2(s−c)·d and C = |s−c|² − R², noting A = |d|² = 1.
+[13] Compute the discriminant Δ = B² − 4C. If Δ is negative, the ray misses the sphere entirely; discard it and move to the next sampled direction.
+[14] Otherwise solve for the two roots t₀ and t₁, and take t as the smaller of the two that is still positive (the nearer valid intersection). If neither root is positive, discard the ray.
+[15] Compute the hit point P = s + td and the outward surface normal N = (P − c)/R.
+[16] Compute the view vector V, the normalized direction from P to the eye. If the dot product N·V is zero or negative, the point faces away from the eye and is invisible from that viewpoint; discard it.
+[17] If the shading at P has not already been computed, evaluate the total intensity there by summing the contribution of every light source j = 1 to n: for each j, find the light vector Lⱼ from P to light j and the reflection vector Rⱼ = 2(N·Lⱼ)N − Lⱼ, then accumulate the ambient term once plus, for every j, the diffuse term k_d(Lⱼ·N) and the specular term k_s(Rⱼ·V)ᵏ, each scaled by that light's intensity. Store the result so a repeated hit at the same point is not recomputed.
+[18] Project P onto the image plane through the eye to determine the corresponding pixel, and assign that pixel the intensity found in step 7.
+[19] Repeat steps 2–8 for every sampled direction of every light source until all lights have been processed; the accumulated pixel values form the rendered image.
+[20] Comment: since the sphere is a single convex object, step 7 requires no shadow-ray/occlusion test — a convex surface cannot shadow itself, so this step is simpler here than in the class algorithm.
+[21] 4. Figures, Formulas and Findings/Comments
+[22] Figure 1 (the reversed scene, shown above) illustrates lights L1 and L2 emitting rays that converge at hit point P, with a single connection ray from P to the eye — the mirror image of the class slide, where the eye emitted the primary ray and shadow rays went out to the lights.
+
+[23] Figure 2 (the intersection geometry, shown above) illustrates the same labels used in class — s, d, c, R, P, N — for the ray–sphere intersection.
+
+[24] Formulas:
+[25] Ray: u(t) = s + t d, |d| = 1
+Sphere: |p − c| = R
+Quadratic: At² + Bt + C = 0, where A = 1, B = 2(s−c)·d, C = |s−c|² − R²
+t = (−B ± √(B² − 4C)) / 2, with:
+Δ < 0 → no intersection · Δ = 0 → tangent · Δ > 0 → two roots, take min(t₀, t₁) with t > 0
+[26] Hit point: P = s + td Normal: N = (P − c)/R
+[27] Illumination (n lights): I = Iₐkₐ + Σᵢ₌₁ⁿ Iₚᵢ(k_d(Lᵢ·N) + k_s(Rᵢ·V)ᵏ)
+[28] Findings/comments:
+[29] Restricting emission to the sphere's solid angle is what makes forward tracing practical — it converts an otherwise near-zero hit probability into a targeted, efficient sampling scheme.
+[30] The closed-form quadratic gives the intersection in O(1) per ray, with the discriminant test allowing a cheap early rejection before any square root is computed.
+[31] Because there is only one, convex object, the usual shadow-ray step is unnecessary — a clear simplification over the class algorithm.
+[32] Back-face culling (N·V ≤ 0) substitutes for a full visibility trace when connecting a hit point to the eye.
+[33] The method generalizes to multiple objects by applying min(t₀, t₁) across all spheres to find the true nearest hit (extending the class rule "Return min(t0, t1)"), at which point the eye-connection ray would also need to be checked for occlusion by the other objects.
